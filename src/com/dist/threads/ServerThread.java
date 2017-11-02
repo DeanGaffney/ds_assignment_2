@@ -14,6 +14,8 @@ import java.sql.Statement;
 import javax.swing.JTextArea;
 
 import com.dist.db.ConnectionPool;
+import com.dist.models.Module;
+import com.dist.models.Student;
 
 /**
  * Server thread deals with client requests
@@ -37,13 +39,15 @@ public class ServerThread implements Runnable{
 		try {
 			inputFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			outputToClient = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-			outputToClient.println("You are connected to the server.... Please enter your Student ID and Module\n");
+			outputToClient.println("You are connected to the server");
+			outputToClient.println("Your address :" + socket.getInetAddress().getHostAddress());
+
 			outputToClient.flush();
 			updateTextArea("Processing...\n");
 			
 			while (true) {
 				Integer studentId = Integer.parseInt(inputFromClient.readLine()); //get student id
-				String moduelName = inputFromClient.readLine();					//get the moduleName
+				String moduleName = inputFromClient.readLine();					//get the moduleName
 				
 				//get connection to the database
 				Connection con = ConnectionPool.getInstance().getConnection();
@@ -54,11 +58,9 @@ public class ServerThread implements Runnable{
 					outputToClient.println("Welcome " + name + "\n");
 					outputToClient.flush();
 
-					double grade = getOverallGrade(con, studentId, moduelName);
-					updateTextArea("Student grade is:" + grade + "\n");
-					outputToClient.println("Your grade is:" + grade + "\n");
+					Student student = createStudent(con, studentId, moduleName);
+					outputToClient.println(student.toString() + "\n");
 					outputToClient.flush();
-
 				}else{
 					//tell them it is invalid
 					outputToClient.println("Sorry " + studentId + ". You are not a registered student bye\n");
@@ -112,35 +114,42 @@ public class ServerThread implements Runnable{
 	}
 	
 	/**
-	 * Gets the overall grade for a specific student for a specific module
-	 * using the specified formula of (CA = 30% & EXAM = 70%)
-	 * @param con - the connection object to the database
-	 * @param studentId - the student id to query
-	 * @param module - the module to query
-	 * @return the overall grade for the module
+	 * Creates a student object from a left join on the student and module table
+	 * @return Student - the student object with all attributes including module with overall grade
 	 */
-	private double getOverallGrade(Connection con, int studentId, String moduleName){
-		double grade = 0;
+	private Student createStudent(Connection con, int studentId, String moduleName){
+		Student student = null;
 		try{
 			Statement statement = con.createStatement();
-			ResultSet resultSet = statement.executeQuery("SELECT STUD_ID, CA_Mark, Exam_Mark, "
-					+ "((CA_Mark / 100.0 * 30 / 1) + (Exam_Mark / 100.0 * 70 / 1)) as overall_grade "
-					+ "FROM modulegrades "
-					+ "WHERE STUD_ID = " +  studentId + " " 
-					+ "AND ModuleName = '" + moduleName + "'");
+			ResultSet resultSet = statement.executeQuery(getStudentQuery(studentId, moduleName));
 			if(resultSet.first()){
-				grade = resultSet.getDouble("overall_grade");
+				Module module = new Module(resultSet.getString("ModuleName"), resultSet.getDouble("CA_Mark"), 
+						resultSet.getDouble("Exam_Mark"), resultSet.getDouble("overall_grade"));
+				student = new Student(resultSet.getInt("STUD_ID"), resultSet.getString("FNAME"), 
+						resultSet.getString("SNAME"), module);
 			}
 		}catch(SQLException e){
 			e.printStackTrace();
 		}
-		return grade;
+		return student;
+	}
+	
+	/**
+	 * Returns the sql left join query on the 
+	 * @return String - the string for the sql query 
+	 */
+	private String getStudentQuery(int studentId, String moduleName){
+		return "SELECT students.STUD_ID, students.FNAME, students.SNAME, modulegrades.ModuleName, modulegrades.CA_Mark, modulegrades.Exam_Mark,"
+				+ "((CA_Mark / 100.0 * 30 / 1) + (Exam_Mark / 100.0 * 70 / 1)) as overall_grade "
+				+ "FROM students "
+				+ "LEFT JOIN modulegrades ON students.STUD_ID = modulegrades.STUD_ID WHERE students.STUD_ID = " + studentId + " " 
+				+ "AND modulegrades.ModuleName = '" + moduleName + "'";
 	}
 	
 	/**
 	 * Updates the servers text area, synchronized so it it locked until this thread
 	 * is completed adding its message to the text area
-	 * @param message
+	 * @param message - the message to display on the board
 	 */
 	private synchronized void updateTextArea(String message){
 		textArea.append(message);
