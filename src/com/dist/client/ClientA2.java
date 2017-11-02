@@ -20,6 +20,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+/**
+ * Client application for sending requests to the server
+ * @author Dean _Gaffney
+ */
 public class ClientA2 extends JFrame{
 
 	private static final long serialVersionUID = 1L;
@@ -83,15 +87,20 @@ public class ClientA2 extends JFrame{
 
 			fromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			toServer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+			
+			while(true){
+				readFromServer();
+			}
 		}
 		catch (IOException ex) {
 			jta.append(ex.toString() + '\n');
-		}finally{
-			try {
-				socket.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		}
+	}
+	
+	private void readFromServer() throws IOException{
+		String response = fromServer.readLine();
+		if(response != null && !response.isEmpty()){
+			jta.append(response + "\n");
 		}
 	}
 
@@ -106,9 +115,7 @@ public class ClientA2 extends JFrame{
 				toServer.println(moduleName);
 				toServer.flush();
 
-				// Get area from the server
-				String serverResponse = fromServer.readLine();
-				jta.append(serverResponse);
+				readFromServer();
 			}
 			catch (IOException ex) {
 				System.err.println(ex);

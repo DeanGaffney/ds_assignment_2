@@ -15,6 +15,10 @@ import javax.swing.JTextArea;
 
 import com.dist.db.ConnectionPool;
 
+/**
+ * Server thread deals with client requests
+ * @author Dean _Gaffney
+ */
 public class ServerThread implements Runnable{
 
 	private Socket socket;
@@ -33,44 +37,39 @@ public class ServerThread implements Runnable{
 		try {
 			inputFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			outputToClient = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-
-			updateTextArea("Processing...");
+			outputToClient.println("You are connected to the server.... Please enter your Student ID and Module\n");
+			outputToClient.flush();
+			updateTextArea("Processing...\n");
 			
 			while (true) {
-				Integer studentId = Integer.parseInt(inputFromClient.readLine());					//get student id
+				Integer studentId = Integer.parseInt(inputFromClient.readLine()); //get student id
 				String moduelName = inputFromClient.readLine();					//get the moduleName
 				
-				while(studentId == null){
-					try{
-						wait();
-						System.out.println(Thread.currentThread().getName() + " waiting");
-					}catch(InterruptedException e){
-						
-					}
-				}
 				//get connection to the database
 				Connection con = ConnectionPool.getInstance().getConnection();
 				
 				if(isValidStudent(con, studentId)){
+					updateTextArea("Student is valid.....\n");
 					String name = getStudentName(con, studentId);
-					outputToClient.println("Welocme " + name + ". You are now connected to the server");
+					outputToClient.println("Welcome " + name + "\n");
+					outputToClient.flush();
+
 					double grade = getOverallGrade(con, studentId, moduelName);
-					outputToClient.println(grade);
+					updateTextArea("Student grade is:" + grade + "\n");
+					outputToClient.println("Your grade is:" + grade + "\n");
+					outputToClient.flush();
+
 				}else{
 					//tell them it is invalid
-					outputToClient.println("Sorry " + studentId + ". You are not a registered student bye");
+					outputToClient.println("Sorry " + studentId + ". You are not a registered student bye\n");
+					outputToClient.flush();
 					socket.close();
+					break;
 				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
-		} finally{
-			try {
-				socket.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		} 
 	}
 
 	/**
@@ -92,6 +91,12 @@ public class ServerThread implements Runnable{
 		return isValid;
 	}
 	
+	/**
+	 * Retrieves the students name from the database
+	 * @param con - connection
+	 * @param studentId - the studentId to query
+	 * @return The students name
+	 */
 	private String getStudentName(Connection con, int studentId){
 		String name = "";
 		try{

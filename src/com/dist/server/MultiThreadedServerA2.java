@@ -3,6 +3,7 @@ package com.dist.server;
 import java.awt.BorderLayout;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Date;
 
 import javax.swing.JFrame;
@@ -12,7 +13,10 @@ import javax.swing.JTextArea;
 import com.dist.threads.ServerThread;
 import com.dist.threads.ThreadPool;
 
-
+/**
+ * Server application for dealing with client requests
+ * @author Dean _Gaffney
+ */
 public class MultiThreadedServerA2 extends JFrame{
 
 	private static final long serialVersionUID = 1L;
@@ -41,7 +45,8 @@ public class MultiThreadedServerA2 extends JFrame{
 				ServerSocket serverSocket = new ServerSocket(8000);
 				textArea.append("Server started at " + new Date() + '\n');
 				while(true){
-					ThreadPool.getInstance().execute(new ServerThread(serverSocket.accept(), textArea));
+					Socket clientSocket = serverSocket.accept();
+					ThreadPool.getInstance().execute(new ServerThread(clientSocket, textArea));
 				}
 			}
 			catch(IOException ex) {
