@@ -1,6 +1,7 @@
 package com.dist.threads;
 
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -35,17 +36,14 @@ public class ServerThread implements Runnable{
 
 	@Override
 	public void run() {
-		updateTextArea("Accepted client address - " + socket.getInetAddress().getHostAddress() +"\n");
+		updateServerTextArea("Accepted client address - " + socket.getInetAddress().getHostAddress() +"\n");
 		try {
 			inputFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			outputToClient = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-			outputToClient.println("You are connected to the server");
-			outputToClient.println("Your address :" + socket.getInetAddress().getHostAddress());
-
-			outputToClient.flush();
-			updateTextArea("Processing...\n");
+			respondToClient("You are connected to the server\n Your address :" + socket.getInetAddress().getHostAddress());
+			updateServerTextArea("Processing...\n");
 			
-			while (true) {
+			while (!socket.isInputShutdown()) {
 				Integer studentId = Integer.parseInt(inputFromClient.readLine()); //get student id
 				String moduleName = inputFromClient.readLine();					//get the moduleName
 				
@@ -53,25 +51,37 @@ public class ServerThread implements Runnable{
 				Connection con = ConnectionPool.getInstance().getConnection();
 				
 				if(isValidStudent(con, studentId)){
-					updateTextArea("Student is valid.....\n");
+					updateServerTextArea("Student is valid.....\n");
 					String name = getStudentName(con, studentId);
-					outputToClient.println("Welcome " + name + "\n");
-					outputToClient.flush();
-
+					if(name != null){
+						respondToClient("Welcome " + name + "\n");
+					}
 					Student student = createStudent(con, studentId, moduleName);
-					outputToClient.println(student.toString() + "\n");
-					outputToClient.flush();
+					if(student != null){		//could be null if user enters the wrong module name
+						respondToClient(student.toString() + "\n");
+					}
 				}else{
 					//tell them it is invalid
-					outputToClient.println("Sorry " + studentId + ". You are not a registered student bye\n");
-					outputToClient.flush();
+					respondToClient("Sorry " + studentId + ". You are not a registered student bye\n Closing socket....\n");
 					socket.close();
 					break;
 				}
 			}
-		} catch (IOException e) {
+			updateServerTextArea("Connection to client was closed....\n");
+		}catch(EOFException | NumberFormatException e){
+			updateServerTextArea("Connection to client was closed....\n");
+		}catch (IOException e) {
 			e.printStackTrace();
-		} 
+		} finally{		//freeup resources so thread can be reclaimed by the OS
+			try {
+				inputFromClient.close();
+				outputToClient.close();
+				socket.close();
+				updateServerTextArea("Resources freed from client\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -104,8 +114,10 @@ public class ServerThread implements Runnable{
 		try{
 			Statement statement = con.createStatement();
 			ResultSet resultSet = statement.executeQuery("SELECT FNAME FROM students WHERE STUD_ID = " + studentId);
-			if(resultSet.first()){
+			if(resultSet.isBeforeFirst() && resultSet.first()){
 				name = resultSet.getString("FNAME");
+			}else{
+				respondToClient("Student has no name.....\n");
 			}
 		}catch(SQLException e){
 			e.printStackTrace();
@@ -122,16 +134,53 @@ public class ServerThread implements Runnable{
 		try{
 			Statement statement = con.createStatement();
 			ResultSet resultSet = statement.executeQuery(getStudentQuery(studentId, moduleName));
-			if(resultSet.first()){
+			if(resultSet.isBeforeFirst() && resultSet.first()){
 				Module module = new Module(resultSet.getString("ModuleName"), resultSet.getDouble("CA_Mark"), 
 						resultSet.getDouble("Exam_Mark"), resultSet.getDouble("overall_grade"));
 				student = new Student(resultSet.getInt("STUD_ID"), resultSet.getString("FNAME"), 
 						resultSet.getString("SNAME"), module);
+			}else{
+				respondToClient("No module found with name:" + moduleName);
+				sendAvailableModuleNames(con);
 			}
 		}catch(SQLException e){
 			e.printStackTrace();
 		}
 		return student;
+	}
+	
+	/**
+	 * Get the list of available modules from the database
+	 * @return A List of module names from the database
+	 */
+	private void sendAvailableModuleNames(Connection con){
+		try{
+			Statement statement = con.createStatement();
+			ResultSet resultSet = statement.executeQuery("SELECT DISTINCT ModuleName FROM modulegrades");
+			if(resultSet.isBeforeFirst()){
+				respondToClient(getDistinctModuleNames(resultSet));
+			}else{
+				respondToClient("There are no modules available to query at this time....please try again later.\n");
+			}
+		}catch(SQLException e){
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Takes in a result set of module names and formats them into a string for the client
+	 * @param resultSet - the result set of module names from the database
+	 * @return String - a message for the client containing the available module names
+	 * @throws SQLException 
+	 */
+	private String getDistinctModuleNames(ResultSet resultSet) throws SQLException{
+		StringBuilder builder = new StringBuilder("Please choose a module from the following:\n");
+		int moduleNum = 1;
+		while(resultSet.next()){
+			builder.append( "\t" + moduleNum + "." + resultSet.getString("ModuleName") + "\n");
+			moduleNum++;
+		}
+		return builder.toString();
 	}
 	
 	/**
@@ -147,11 +196,20 @@ public class ServerThread implements Runnable{
 	}
 	
 	/**
+	 * Helper method to send messages to the client
+	 * @param message - the message to send to the client
+	 */
+	private void respondToClient(String message){
+		outputToClient.println(message);
+		outputToClient.flush();
+	}
+	
+	/**
 	 * Updates the servers text area, synchronized so it it locked until this thread
 	 * is completed adding its message to the text area
 	 * @param message - the message to display on the board
 	 */
-	private synchronized void updateTextArea(String message){
+	private synchronized void updateServerTextArea(String message){
 		textArea.append(message);
 	}
 }

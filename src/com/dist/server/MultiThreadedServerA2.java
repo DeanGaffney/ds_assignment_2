@@ -15,7 +15,7 @@ import com.dist.threads.ThreadPool;
 
 /**
  * Server application for dealing with client requests
- * @author Dean _Gaffney
+ * @author Dean Gaffney
  */
 public class MultiThreadedServerA2 extends JFrame{
 
@@ -34,7 +34,7 @@ public class MultiThreadedServerA2 extends JFrame{
 		add(new JScrollPane(textArea), BorderLayout.CENTER);
 
 		setTitle("Server");
-		setSize(500, 300);
+		setSize(500, 500);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setVisible(true); // It is necessary to show the frame here!
 

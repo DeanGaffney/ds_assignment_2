@@ -1,6 +1,7 @@
 package com.dist.client;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
@@ -11,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -31,6 +33,7 @@ public class ClientA2 extends JFrame{
 	private JTextField studentIdTextField = new JTextField(10);
 	private JTextField moduleNameTextField = new JTextField(10);
 	private JButton submitButton = new JButton("Submit");
+	private JButton closeButton = new JButton("Close");
 
 	// Text area to display contents
 	private JTextArea jta = new JTextArea();
@@ -67,16 +70,18 @@ public class ClientA2 extends JFrame{
 		p.add(moduleNameTextField, right);
 
 		p.add(submitButton, south);
+		p.add(closeButton, south);
+		
 		getContentPane().add(p);
 
 		setLayout(new BorderLayout());
 		add(p, BorderLayout.NORTH);
 		add(new JScrollPane(jta), BorderLayout.CENTER);
-
 		submitButton.addActionListener(new Listener());
+		addCloseActionListener(closeButton);
 
 		setTitle("Client");
-		setSize(500, 300);
+		setPreferredSize(new Dimension(500, 500));
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		pack();
 		setVisible(true); // It is necessary to show the frame here!
@@ -97,13 +102,36 @@ public class ClientA2 extends JFrame{
 		}
 	}
 	
+	/**
+	 * Reads a response from the server and appends it to the text area
+	 * @throws IOException
+	 */
 	private void readFromServer() throws IOException{
 		String response = fromServer.readLine();
 		if(response != null && !response.isEmpty()){
 			jta.append(response + "\n");
 		}
 	}
+	
+	/**
+	 * Adds an action listener to the close button using java 8 lambdas
+	 * @param closeButton - the button to add the action listener to
+	 */
+	private void addCloseActionListener(JButton closeButton){
+		closeButton.addActionListener(action ->{
+			try{
+				socket.close();
+				System.exit(0);
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		});
+	}
 
+	/**
+	 * Action listener for the submit button
+	 * @author Dean Gaffney
+	 */
 	private class Listener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {

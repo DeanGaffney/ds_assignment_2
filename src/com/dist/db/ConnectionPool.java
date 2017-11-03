@@ -12,7 +12,6 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 public class ConnectionPool {
 
-	private static ConnectionPool dataSource;
 	private ComboPooledDataSource comboPooledDataSource;
 	
 	//Database Details
@@ -35,15 +34,21 @@ public class ConnectionPool {
 			ex1.printStackTrace();
 		}
 	}
+	
+	/**
+	 * Holder forces the singleton pattern to be thread safe, see here - https://stackoverflow.com/questions/16106260/thread-safe-singleton-class
+	 * @author Dean Gaffney
+	 */
+	private static class Holder{
+		private static final ConnectionPool INSTANCE = new ConnectionPool();
+	}
 
 	/**
 	 * Gets the singleton instance
 	 * @return ConnectionPool instance
 	 */
 	public static ConnectionPool getInstance() {
-		if (dataSource == null)
-			dataSource = new ConnectionPool();
-		return dataSource;
+		return Holder.INSTANCE;
 	}
 
 	/**
